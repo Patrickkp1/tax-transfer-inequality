@@ -1,0 +1,37 @@
+# =============================================================================
+# Tax & Transfer Inequality Pipeline — Python dependencies
+# =============================================================================
+# Install with:
+#     pip install -r requirements.txt
+#
+# Tested with Python 3.10–3.13.  Pinned to the lowest reasonable major version
+# that supports every API the scripts use; you can upgrade individual packages
+# without breaking the pipeline.
+# =============================================================================
+
+# --- Core data manipulation ---
+pandas>=2.0          # all 9 scripts; pivot/groupby/merge semantics changed in 2.x
+numpy>=1.23          # 8 scripts; needed for vectorised arithmetic and NaN-safe ops
+
+# --- Excel I/O ---
+# Pandas does NOT install Excel engines automatically.  The pipeline reads
+# both modern .xlsx (e.g. CBO tables, OMB outlays_fy2027.xlsx, BLS NHE2024.xlsx)
+# and a handful of legacy .xls files (IRS SOI 22in41ts.xls, NNin03etr.xls
+# 2014–2018, USDA cncost.xlsx, etc.), so both engines are required.
+openpyxl>=3.1        # .xlsx engine for pd.read_excel
+xlrd==1.2.0          # .xls engine.  IMPORTANT: xlrd 2.0+ dropped .xls support
+                     # entirely (only .xlsx, redundant with openpyxl).
+                     # Pin to 1.2.0 — the last version that reads .xls.
+
+# --- Visualisation ---
+# Used by income_visualizations.py, charts_5_6_ultra_top.py,
+# report_figures.py, and cpi_bias_adjusted_v3_dbpi.py.
+plotly>=5.18         # interactive figure builder
+kaleido==0.2.1       # static image export backend that fig.write_image() uses.
+                     # Pin to 0.2.1 — the 1.0.x release line is incompatible
+                     # with plotly < 6 and routinely fails with import errors
+                     # on Linux/macOS as of mid-2026.
+
+# --- HTTP fetching ---
+# Used only by cpi_bias_adjusted_v3_dbpi.py to pull series from FRED.
+requests>=2.28

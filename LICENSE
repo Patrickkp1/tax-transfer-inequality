@@ -1,0 +1,41 @@
+MIT License
+
+Copyright (c) 2026 Patrick Poleshuk
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---------------------------------------------------------------------------
+Note on third-party data:
+
+This repository's source code is licensed under the terms above.  However,
+the underlying datasets in data/raw/ are redistributed from their original
+publishers — the U.S. Census Bureau (via IPUMS), Congressional Budget Office,
+Internal Revenue Service Statistics of Income Division, Office of Management
+and Budget, Bureau of Economic Analysis, Bureau of Labor Statistics, Social
+Security Administration, USDA Food and Nutrition Service, U.S. Department of
+Health and Human Services / CMS, USAC, the Tax Policy Center / Census State
+& Local Government Finance, and Giving USA.  Each retains its own license,
+attribution, and redistribution policy.  IPUMS in particular requires user
+registration and an end-user agreement; the cps_00015.csv extract included
+in this repository was obtained under a personal IPUMS account and is
+redistributed solely for replication of the analyses in this repository
+(see https://cps.ipums.org/cps/citation.shtml for required citation).
+
+The MIT License above applies only to the source code, scripts, and derived
+panel CSVs in output/ — not to the upstream data files in data/raw/.

@@ -14,14 +14,12 @@ Tables, BLS, SSA, CMS, USDA, USAC, the Tax Policy Center / Census State &
 Local Government Finance survey, and Giving USA. Every dollar of income,
 transfer, and tax is traced back to a primary public source.
 
-The framing draws on Phil Gramm, Robert Ekelund, and John Early's
-*The Myth of American Inequality* (Rowman & Littlefield, 2022), which
-argues that the official Census Bureau "money income" measure is the wrong
-quantity for distributional analysis — it omits both two-thirds of federal
-transfer payments (Medicare, Medicaid, SNAP, housing, EITC, refundable
-CTC) and 100% of taxes paid. This project replicates that argument's data
-architecture end-to-end from public sources rather than relying on the
-book's intermediate appendices.
+The framing draws on the argument that the official Census Bureau "money income" 
+measure is the wrong quantity for distributional analysis — it omits both 
+two-thirds of federal transfer payments (Medicare, Medicaid, SNAP, housing, 
+EITC, refundable CTC) and 100% of taxes paid. This project replicates that 
+argument's data architecture end-to-end from public sources rather than 
+relying on the book's intermediate appendices.
 
 ---
 

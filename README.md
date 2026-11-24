@@ -1,691 +1,220 @@
-# U.S. Household Income, Taxes, and Transfers
-## A Reproducible Distributional Panel, 1979–2022
+# U.S. Household Income After Taxes and Transfers, 1979–2022
 
-This project builds a long-format distributional accounting panel covering
-earned income, government transfers, private transfers, and the full tax
-burden (federal + state & local) for U.S. households by income quintile from
-1979 through 2022. Upper-tail groups (the 81–90, 91–95, 96–99 sub-groups,
-the Top 1%, Top 0.1%, Top 0.01%, Top 0.001%, and the Forbes 400) are
-included where data permit.
+This project measures what U.S. households earn, what they receive in government and private transfers, and what they pay in federal, state and local taxes. It covers each income quintile from 1979 to 2022, plus groups inside the top 20% down to the 400 highest-income tax returns.
 
-The pipeline supplements CPS ASEC microdata with administrative control
-totals from the CBO, IRS Statistics of Income, BEA NIPA, OMB Historical
-Tables, BLS, SSA, CMS, USDA, USAC, the Tax Policy Center / Census State &
-Local Government Finance survey, and Giving USA. Every dollar of income,
-transfer, and tax is traced back to a primary public source.
-
-The framing draws on the argument that the official Census Bureau "money income" 
-measure is the wrong quantity for distributional analysis — it omits both 
-two-thirds of federal transfer payments (Medicare, Medicaid, SNAP, housing, 
-EITC, refundable CTC) and 100% of taxes paid. This project replicates that 
-argument's data architecture end-to-end from public sources rather than 
-relying on the book's intermediate appendices.
-
----
-
-## Why this project exists
-
-The U.S. Census Bureau's official income-inequality measure counts only
-"money income" — wages, salaries, and a handful of cash transfers (Social
-Security, SSI, public assistance, unemployment insurance). It excludes:
-
-* **Roughly two-thirds of all federal transfer payments** — Medicare,
-  Medicaid, SNAP, housing assistance, the EITC, and the refundable Child
-  Tax Credit. None of these flow through household checking accounts the
-  way the 1947-vintage Census definition required.
-* **All federal, state, and local taxes paid.** A household earning $200K
-  and a household earning $30K both contribute their *pretax* figure to
-  the Census ranking, even though the higher-income household typically
-  loses ~33% of pretax income to taxes and the lower-income household ~7%.
-
-The mismatch has grown over the period this panel covers. In 1947, government
-transfers were 2.5% of personal income and Census counted >90% of them. By
-1979, transfers had risen to 11.8% and Census counted less than half. By
-2017, transfers were 18.2% of personal income and Census counted roughly
-one-third. The taxes-paid omission has the opposite tilt at the top: the
-federal tax code became more progressive post-1979, so the gap between
-Census's pretax measure and a post-fisc measure has widened systematically.
-
----
-
-## Repository structure
+The Census Bureau's official "money income" leaves out in-kind government transfers (Medicare, Medicaid, SNAP, housing aid) and every tax households pay. This project adds them, using national totals from the agency that pays or collects each one.
 
 ```
-tax-transfer-inequality/
-│
-├── README.md                  ← this file
-├── LICENSE                    ← MIT
-├── requirements.txt           ← Python dependencies
-│
-├── src/                       ← canonical Python scripts (9 files)
-│   ├── build_earned_income_panel.py            Stage 1
-│   ├── transfer_distribution_panel.py          Stage 2
-│   ├── tax_distribution_panel.py               Stage 3
-│   ├── income_after_taxes_transfers_panel.py   Stage 4
-│   ├── top_percentile_taxes_transfers_panel.py Stage 5
-│   ├── income_visualizations.py                Charts 1–4 (quintile-level)
-│   ├── charts_5_6_ultra_top.py                 Charts 5–6 (top-of-distribution)
-│   ├── report_figures.py                       Charts for the research report
-│   ├── cpi_bias_adjusted_v3_dbpi.py            True-CPI deflator builder
-│   └── reserve + data scripts/                 retired helpers, kept for audit
-│
-├── notebooks/                 ← Jupyter versions of the nine scripts above
-│   ├── 01_build_earned_income_panel.ipynb
-│   ├── 02_transfer_distribution_panel.ipynb
-│   ├── 03_tax_distribution_panel.ipynb
-│   ├── 04_income_after_taxes_transfers_panel.ipynb
-│   ├── 05_top_percentile_taxes_transfers_panel.ipynb
-│   ├── 06_income_visualizations.ipynb
-│   ├── 07_charts_5_6_ultra_top.ipynb
-│   ├── 08_report_figures.ipynb
-│   ├── 09_cpi_bias_adjusted_v3_dbpi.ipynb
-│   └── README.md
-│
-├── tools/
-│   └── py_to_nb.py            ← regenerate notebooks from src/
-│
-├── data/raw/                  ← every administrative input the scripts read
-│   ├── bea/                   BEA NIPA Table 3.12 (government social benefits)
-│   ├── bls_ce/                BLS Consumer Expenditure Survey
-│   ├── bls_pumd/              BLS CE public-use microdata, intrvw15-22.zip
-│   ├── cbo/                   CBO distributional supplemental tables 01–12
-│   ├── census_sl/             TPC/Census State & Local Government Finance
-│   ├── forbes-400-irs/        IRS Top 400 PDFs, 1992–2014
-│   ├── giving_USA/            Giving USA recipient totals 1979–2022 (CSV)
-│   ├── irs_soi/               IRS SOI Table 4.1 + Table 3/4.3 income composition
-│   ├── itep/                  ITEP "Who Pays?" cross-reference (not in pipeline)
-│   ├── meds/                  CMS National Health Expenditures (Medicare)
-│   ├── oasdi/                 SSA OASI/DI Trust Fund Cost CSVs
-│   ├── omb/                   OMB Historical Tables 2.1/2.4/2.5 + outlays_fy2027
-│   ├── psz/                   Piketty-Saez-Zucman DINA tables (cross-reference)
-│   ├── ahs/                   American Housing Survey (reserve)
-│   ├── usac/                  USAC USF Lifeline disbursements + annual reports
-│   └── usda/                  USDA NSLP, WIC, SNAP outlay tables
-│
-├── output/                    ← all generated artefacts
-│   ├── earned_income_panel.csv
-│   ├── transfer_distribution_panel.csv
-│   ├── tax_distribution_panel.csv
-│   ├── income_after_taxes_transfers_panel.csv
-│   ├── top_percentile_taxes_transfers_panel.csv
-│   ├── cpi_adjusted_v3_dbpi_1979_2022.csv
-│   ├── cpi_headline_v3.png
-│   └── fig_*.png  (9 generated charts)
-│
-└── docs/                      ← written documentation
-    ├── research_report.tex
-    ├── research_report.pdf
-    └── DATA_DICTIONARY_AND_METHODOLOGY.md   (early-vintage reference, retained)
+income after taxes and transfers = earned income + government transfers + private transfers - taxes
 ```
 
-Each panel-builder script auto-discovers `data/raw/` by walking up from its
-own location, so the pipeline runs the same whether the script lives in
-`src/` or in `notebooks/`. Override either folder by setting `DATA_ROOT`
-or `OUTPUT_DIR` environment variables.
+The paper is `Measuring-Inequality-After-Taxes-and-Transfers-v24.docx`.
 
 ---
 
-## Pipeline
+## Run order
 
-```
-                               ┌── CPS ASEC microdata (IPUMS)
-                               ├── CBO Table 5 (income composition)
-                               ├── BLS ECEC benefit rates (inline constants)
-                               └── True CPI deflator (Early & Furth 2021)
-                                          │
-                                          ▼
-                            build_earned_income_panel.py  ── Stage 1
-                                          │
-                                          ▼
-                              earned_income_panel.csv
-                                          │
-                                          │
-       CPS ASEC ─────────────────────────────────────┐
-       CBO T05/T06 (income & means-tested) ──────────┤
-       SSA OASI & DI Trust Fund Cost ────────────────┤
-       CMS NHE (Medicare) ───────────────────────────┤  ──►  transfer_distribution_panel.py
-       BEA NIPA Table 3.12 ──────────────────────────┤              │  ── Stage 2
-       OMB outlays_fy2027 (Function 604 + CRS) ──────┤              ▼
-       USDA NSLP + WIC ──────────────────────────────┤   transfer_distribution_panel.csv
-       USAC USF Lifeline ────────────────────────────┘              │
-                                                                    │
-       CPS ASEC (homeowner × wage) ────────┐                        │
-       CBO T01/T07/T12 ────────────────────┤                        │
-       OMB Tables 2.1 / 2.4 / 2.5 ─────────┤  ──►  tax_distribution_panel.py
-       TPC/Census S&L Finance (results.csv)┤              │  ── Stage 3
-       BLS CEX expenditure-share panel ────┘              ▼
-                                                tax_distribution_panel.csv
-                                                                    │
-   earned_income_panel.csv ──────────┐                              │
-   transfer_distribution_panel.csv ──┤                              │
-   tax_distribution_panel.csv ───────┤  ──►  income_after_taxes_transfers_panel.py
-   CPS ASEC (private-transfer cols) ─┤              │   ── Stage 4
-   Giving USA recipient CSV ─────────┘              ▼
-                                  income_after_taxes_transfers_panel.csv
-                                                                    │
-   CBO T01/T03/T05/T07 ───────────────┐                              │
-   IRS T41TS (22in41ts.xls) ──────────┤                              │
-   IRS Top 400 (1992-2014 PDFs)   ────┤                              │
-   IRS Table 3 / 4.3 (2014–2022 xls) ─┤  ──►  top_percentile_taxes_transfers_panel.py
-   TPC/Census S&L Finance ────────────┤                  │   ── Stage 5
-   BLS CEX expenditure-share panel ───┤                  ▼
-   CPS ASEC ──────────────────────────┘  top_percentile_taxes_transfers_panel.csv
-                                                                    │
-                                                                    ▼
-                              Visualization layer (Stages 6–8):
-                              income_visualizations.py    →  5 figures
-                              charts_5_6_ultra_top.py     →  2 figures
-                              report_figures.py           →  2 figures
-                              cpi_bias_adjusted_v3_dbpi.py →  True CPI series + 2 figures
-```
-
----
-
-## Stage descriptions
-
-### Stage 1 — `build_earned_income_panel.py`
-Per-household earned income by quintile, 1979–2022. Households are ranked
-annually by total earned income using CPS ASEC survey weights.
-
-* Earned income = wages + employer benefits (BLS ECEC-imputed) +
-  business income + financial income (interest, dividends, rent, retirement).
-* Employer-paid benefits are imputed from year-specific BLS Employer Costs
-  for Employee Compensation (ECEC) ratios applied to wages.
-* A small in-kind compensation correction is added to the lower quintiles
-  to account for non-cash compensation not captured by CPS ASEC, consistent
-  with Meyer & Sullivan (2012). The corrections are: Bottom +17.1%,
-  Second +9.6%, Middle +6.8%, Fourth +4.2%, Top +3.6% of wage income.
-
-Writes `output/earned_income_panel.csv` (220 rows: 5 quintiles × 44 years).
-
-### Stage 2 — `transfer_distribution_panel.py`
-Government transfer payments by quintile, 1979–2022. Covers OASI, SSDI,
-Medicare (net of beneficiary-paid Part B/D premiums and out-of-pocket cost
-sharing), Medicaid + CHIP, SNAP, all other federal transfers (UI, TANF,
-SSI, EITC, housing, etc.), and state & local safety-net programs.
-
-National program totals come from administrative sources rather than
-self-reported CPS receipts (which substantially underreport in-kind
-benefits):
-
-| Program | National-total source |
-|---|---|
-| OASI | SSA *Annual Statistical Supplement, 2025*, Table 4.A1 |
-| SSDI | SSA *Annual Statistical Supplement, 2025*, Table 4.A2 |
-| Medicare (gross) | CMS National Health Expenditure, NHE2024.xlsx |
-| Medicare premium offset | CMS Medicare Trustees Report (SMI summary tables) |
-| Medicare cost-share offset | MedPAC Payment Basics; CMS Actuarial Reports |
-| Medicaid + CHIP | BEA NIPA Table 3.12 |
-| SNAP | BEA NIPA Table 3.12 |
-| Other cash | BEA NIPA Table 3.12 |
-| Housing Subfunction 604 | OMB Public Budget Database `outlays_fy2027.xlsx`, summed across all rows with Subfunction Code = 604 |
-| LIHEAP, Head Start, CCDBG, CCE, SSBG, Foster Care, TANF | OMB Public Budget Database, account-level rows |
-| NSLP | USDA cncost.xlsx |
-| WIC | USDA wisummary.xlsx |
-| Lifeline (USAC USF) | USAC `USAC_USF_Disbursements_1998_2022.xlsx` (hand-cleaned panel built from USAC Annual Reports 1999–2024) |
-
-**Quintile distribution weights** come from CBO Tables 5 and 6, except for
-OASI where the script re-ranks households by earned income using the CPS
-ASEC extract when available (and falls back to CBO Table 5 social-security
-shares otherwise). Medicare is reported net of premiums and out-of-pocket
-cost-sharing so the figure reflects only the government-financed portion.
-
-Writes `output/transfer_distribution_panel.csv` (220 rows).
-
-### Stage 3 — `tax_distribution_panel.py`
-Full household tax burden (federal + state & local) by quintile, 1979–2022.
-
-**Federal taxes** — personal income, payroll (OASDI + Medicare HI), excise,
-estate/gift, customs, FUTA, railroad retirement, and other retirement —
-come from CBO Tables 07 and 12 (per-household averages and quintile shares),
-supplemented with OMB Historical Tables 2.1, 2.4, and 2.5 (`BUDGET-2022-TAB-3-1/3-4/3-5.xlsx`)
-to back out specific receipt categories. Corporate income tax is excluded
-from the household burden — households don't write a check for it directly.
-
-**State and local taxes** are distributed from TPC/Census State & Local
-Government Finance national totals (`results.csv`) using three keys:
-
-| Component | Distribution key | Source |
-|---|---|---|
-| Sales (general + selective) | Year-specific quintile expenditure shares | BLS CEX panel (1984+; 1979–1983 use 1984 proxy) |
-| Motor vehicle + other | Same CEX expenditure shares | BLS CEX panel |
-| Property | Homeownership × household income proxy | CPS ASEC `OWNERSHP` × earned |
-| State individual income | Wage income shares | CPS ASEC `INCWAGE` |
-
-Writes `output/tax_distribution_panel.csv` (220 rows).
-
-### Stage 4 — `income_after_taxes_transfers_panel.py`
-Assembly stage. Joins the three upstream panels and adds **private
-transfers** to compute Income Before Taxes (IBT) and Income After Taxes
-and Transfers (IAT):
-
-```
-IBT = earned + govt_transfers + private_transfers
-IAT = IBT − total_taxes
-```
-
-Private transfers come from three independent components:
-
-| Component | Source | Distribution weights |
-|---|---|---|
-| Child support + alimony | CPS `INCCHILD`, `INCALIM`, `INCALOTH` | Census Child Support Supplement 2018; Q1=15%, Q2=35%, Q3=28%, Q4=14%, Q5=8% |
-| Informal cash assistance | CPS `INCASIST`, `INCOTHER` | Karen (2023) LIS WP 851 Table 2 Model 1, normalized bivariate odds ratios |
-| Household-directed charitable giving | `data/raw/giving_USA/giving_usa_recipients_1979_2022.csv` | Feeding America client distribution × CBO means-tested transfer shares |
-
-For the Giving USA component, each recipient category is multiplied by the
-share of donations actually reaching households:
-
-| Recipient category | HH-directed fraction | Rationale |
-|---|---|---|
-| Religion | 5% | Food pantries, emergency cash from congregations |
-| Education | 5% | Direct scholarships and student aid |
-| Human Services | 50% | Feeding America, food banks, emergency cash |
-| Foundations | 0% | Pass-through vehicles; counting would double-count |
-| Health | 8% | Hospital charity care, patient assistance programs |
-| Public-Society Benefit | 5% | Community development, some direct aid |
-| International Affairs | 25% | GiveDirectly, food/medicine transfers |
-| Arts / Culture | 0% | Institutional; does not reach individual households |
-| Environment / Animals | 0% | Institutional |
-| Individuals | 100% | By definition |
-
-The quintile distribution of the household-directed total follows Feeding
-America's published client income distribution: Q1=45%, Q2=30%, Q3=15%,
-Q4=6%, Q5=4%.
-
-Writes `output/income_after_taxes_transfers_panel.csv` (264 rows: 6 groups × 44 years).
-
-### Stage 5 — `top_percentile_taxes_transfers_panel.py`
-Extends the framework to ultra-high-income groups beyond the top quintile:
-the 81–90, 91–95, 96–99, and Top 1% sub-groups (from CBO), plus Top 0.1%,
-Top 0.01%, and Top 0.001% (from IRS Table 4.1 Time Series, 2001–2022),
-and the Forbes 400 (from IRS Top 400 publications, 1992–2014, with
-T41TS-based estimates for 2015–2022).
-
-* IRS Table 3 / 4.3 income-composition files (`*in03etr*.xls` for 2014–2018,
-  `*in43ts*.xls` for 2019–2022 — IRS renamed the table in 2019 with no
-  schema change) feed labor / capital / pass-through splits.
-* State & local taxes for ultra-top groups are scaled from the Top
-  quintile burden using income-elasticity proxies (square root for
-  property taxes, etc.).
-* Private transfers for sub-groups inside the Top 20 are estimated by
-  scaling the Top quintile per-HH value with a square-root income-elasticity
-  decay. These should be read as upper bounds (actual ultra-top receipts
-  likely closer to zero).
-
-Writes `output/top_percentile_taxes_transfers_panel.csv` (~493 rows).
-
-### Stages 6–8 — Visualizations
-Three scripts that read the panels and produce nine figures, all written
-to `output/`:
-
-| Script | Figure |
-|---|---|
-| `income_visualizations.py` | `fig_real_earned_income_by_quintile.png`, `fig_real_income_after_taxes_transfers_by_quintile.png`, `fig_effective_tax_rate_by_quintile.png`, `fig_iat_pct_of_earned_by_quintile.png`, `fig_cumulative_income_growth_nominal_vs_real.png` |
-| `charts_5_6_ultra_top.py` | `fig_real_earned_income_top_groups.png`, `fig_real_income_after_taxes_transfers_top_groups.png` |
-| `report_figures.py` | `fig_inequality_ratio_before_after_fisc.png`, `fig_net_fiscal_position_by_quintile_2022.png` |
-
-### Stage 9 — True CPI deflator (`cpi_bias_adjusted_v3_dbpi.py`)
-Constructs the inflation index used to deflate the panels to real dollars.
-Pulls eight series from FRED and the BLS Disease-Based Price Index (DBPI)
-to produce three headline series: CPI-U (official), Chained CPI / PCEPI
-(substitution bias removed), and True CPI (substitution + quality +
-new-product bias removed).
-
-Writes `output/cpi_adjusted_v3_dbpi_1979_2022.csv` and two PNGs.
-
-The True CPI series compounds an empirical quality / new-product bias
-schedule on top of the substitution-corrected index:
-
-| Years | Remaining bias (pp/yr) | Source |
-|---|---|---|
-| 1979–1999 | 0.60 | Boskin Commission (1996) — pre-BLS geometric-mean reform |
-| 2000–2017 | 0.37 | Moulton (2018) / Lebow & Rudd (2003) — post-reform residual |
-| 2018–2022 | 0.30 | Post-BLS hedonic mobile-phone expansion (Jan 2018) |
-
-By 2022, the cumulative gap between CPI-U (+303%) and True CPI (+176%) is
-127 percentage points. The choice of deflator is not distributionally
-neutral: the bottom quintile's real after-tax-and-transfer income grows
-129% over 1979–2022 under True CPI but only ~33% under CPI-U.
-
----
-
-## Output panels
-
-| File | Rows | Description |
-|---|---:|---|
-| `earned_income_panel.csv` | 220 (5 × 44) | Earned income components by quintile |
-| `transfer_distribution_panel.csv` | 220 | Government transfers by quintile |
-| `tax_distribution_panel.csv` | 220 | Full federal + S&L tax burden by quintile |
-| `income_after_taxes_transfers_panel.csv` | 264 (6 × 44) | IBT / IAT assembly with private transfers |
-| `top_percentile_taxes_transfers_panel.csv` | ~493 | Ultra-top distributional accounting |
-| `cpi_adjusted_v3_dbpi_1979_2022.csv` | 44 | Deflators: CPI-U, Chained CPI, True CPI |
-
----
-
-## Headline findings
-
-(All figures from the panels; see `docs/research_report.pdf` for full
-discussion.)
-
-* **Earned income at the bottom shrank in real terms.** Real earned income
-  for the bottom quintile fell 48% between 1979 and 2022 (Early & Furth
-  True CPI). For the top quintile it rose 108%.
-* **After taxes and transfers, every quintile gained.** Real income after
-  taxes and transfers rose 129% for the bottom quintile, 201% for the
-  middle, and 349% for the top quintile.
-* **The before/after gap matters quantitatively.** The top-to-bottom
-  earned-income ratio in 2022 is 96×. The top-to-bottom IAT ratio is
-  4.4×. In 1979, those two ratios were 24× and 2.3× respectively. The
-  fiscal system is doing increasing redistributive work.
-* **Effective tax rates differ sharply across quintiles in 2022.** The
-  bottom quintile has a signed effective rate of −1,341% of earned income
-  (transfers far exceed taxes). The middle is roughly fiscally neutral at
-  −2%. The Top 1% pays +32%; the Top 0.001% pays +28%.
-* **The very top is taxed at a slightly lower effective rate than the rest
-  of the top quintile**, consistent with the larger capital-gains share of
-  AGI at higher percentiles (preferential rates) and the cap on payroll
-  taxes.
-
----
-
-## How to reproduce
-
-### Setup
+Run from the repo folder. Each script reads the outputs of the ones before it.
 
 ```bash
-git clone https://github.com/Patrickkp1/tax-transfer-inequality.git
-cd tax-transfer-inequality
 pip install -r requirements.txt
+
+# The panel
+python src/state_income_tax_taxsim.py                   # 0. state income tax shares, 1979-1991 (NBER TAXSIM)
+python src/build_earned_income_panel_v6.py              # 1. earned income
+python src/transfer_distribution_panel_v16.py           # 2. government transfers
+python src/tax_distribution_panel_v9.py                 # 3. taxes
+python src/income_after_taxes_transfers_panel_v7.py     # 4. puts 1-3 together, adds private transfers
+python src/top_percentile_taxes_transfers_panel_v9.py   # 5. groups inside the top 20%
+python src/sensitivity_table.py                         # 6. robustness tables (Tables 1 and 2)
+
+# Figures and tables in the paper (any order, after step 5)
+python src/report_figures_v4.py             # Figures 1 and 2
+python src/income_visualizations_v3.py      # Figures 4, 5 and 6
+python src/charts_5_6_ultra_top_v4.py       # Figure 7
+python src/per_person_figures_v2.py         # Figures 8 and 9
+python src/top1_share_comparison_v4.py      # Figure 10 and Table 3
+python src/inequality_decomposition.py      # Table 4
+python src/appendix_group_tables_v4.py      # Tables A1-A4
+python src/tax_rate_and_gini_figures_v2.py  # Figures A1 and A2
+
+# Optional
+CREDIT_BASIS=fair_value python src/transfer_distribution_panel_v16.py   # loans at fair value (footnote 19)
+python src/cpi_bias_adjusted_v5_dbpi.py     # rebuild the price index and Figure 3 (downloads from FRED)
+python src/group_summary_table.py           # one-page summary table (not in the paper)
+python src/top1_effective_tax_rate.py       # top 1% tax rate chart (not in the paper)
 ```
 
-### One-time data downloads
+Every script stops with an error if an input file or a year is missing, instead of filling in zeros. Inputs are found anywhere under `data/raw/`; set `DATA_ROOT` or `OUTPUT_DIR` to use other folders. Older versions of the scripts are in `src/archive/` and are not used.
 
-The repo includes most administrative inputs, but two require external
-accounts or large downloads:
-
-* **CPS ASEC microdata (`data/raw/cps_00015.csv`)** — register at
-  [cps.ipums.org](https://cps.ipums.org), build an extract using survey
-  years 1980–2023 and the variable list under "CPS variables required"
-  below, place the resulting CSV at `data/raw/cps_00015.csv`. IPUMS
-  requires an end-user agreement; the extract is not redistributed in
-  this repo.
-
-* **CBO supplemental tables** — download the latest distributional
-  supplement Excel from [cbo.gov/publication/59509](https://www.cbo.gov/publication/59509),
-  place the CSV exports of tables 01, 03, 05, 06, 07, and 12 in
-  `data/raw/cbo/`. The filenames the scripts expect match the pattern
-  `households_ranked_by_market_inc_table_XX_*_1979_*.csv`.
-
-All other inputs are already in `data/raw/` after a fresh clone.
-
-### Execution order
-
-Pipeline stages 1–5 must run in order (later stages read CSVs written by
-earlier ones). Visualization stages 6–8 can run after stage 5 in any
-order.
-
-```bash
-# Stage 1 — earned income
-python src/build_earned_income_panel.py
-
-# Stage 2 — government transfers
-python src/transfer_distribution_panel.py
-
-# Stage 3 — tax distribution
-python src/tax_distribution_panel.py
-
-# Stage 4 — IBT / IAT assembly with private transfers
-python src/income_after_taxes_transfers_panel.py
-
-# Stage 5 — ultra-top groups
-python src/top_percentile_taxes_transfers_panel.py
-
-# Charts (any order after stage 5)
-python src/income_visualizations.py
-python src/charts_5_6_ultra_top.py
-python src/report_figures.py
-
-# Optional: refresh the True CPI deflator (queries FRED at runtime)
-python src/cpi_bias_adjusted_v3_dbpi.py
-```
-
-Or use the Jupyter equivalents — `jupyter notebook notebooks/` and step
-through `01_*` through `09_*` in numeric order.
-
-### Compile the research report
-
-The PDF in `docs/research_report.pdf` is built from `research_report.tex`
-plus the figures in `output/`. To rebuild:
-
-```bash
-cd docs
-pdflatex research_report.tex
-pdflatex research_report.tex   # second pass resolves cross-references
-```
-
-Requires a TeX distribution (MacTeX, TeX Live, or Overleaf for online
-compilation).
+Step 0 needs a second CPS extract (below) and an internet connection: it sends each tax return to NBER's TAXSIM server over ssh (built into macOS) and takes about ten minutes. To run TAXSIM locally instead, download the program from [NBER](https://taxsim.nber.org/taxsim35/low-level-local.html) and set `TAXSIM_EXE` to its path. If step 0's output is missing, step 3 warns and holds the 1991 shares for 1979–1990.
 
 ---
 
-## CPS variables required (IPUMS extract)
+## What each script does
 
-The pipeline expects these variables in the IPUMS CPS extract:
+**0. state_income_tax_taxsim.py** → `output/state_income_tax_shares_taxsim.csv`
+- Builds tax returns from the CPS (married couples file jointly; children under 19 living with a parent are dependents), runs each through NBER TAXSIM 35 with that year's state law, and adds them up by quintile.
+- The CPS has no capital gains or itemized deductions, so TAXSIM gets zeros for those.
+- Step 3 uses the year-to-year change in these shares, tied to the CPS `STATETAX` shares in 1991.
 
-* **Identifiers**: `YEAR`, `SERIAL`, `ASECWTH`, `ASECFLAG`, `RELATE`
-* **Demographics**: `AGE`, `EMPSTAT`, `SCHLCOLL`, `OWNERSHP`
-* **Hours**: `WKSWORK1`, `UHRSWORKLY`, `UHRSWORK1`, `HOURWAGE`, `PAIDHOUR`
-* **Earned income**: `INCWAGE`, `INCBUS`, `INCFARM`
-* **Capital / retirement income**: `INCDIVID`, `INCINT`, `INCRENT`, `INCRETIR`
-* **Aggregates**: `HHINCOME`
-* **Private transfers**: `INCCHILD`, `INCASIST`, `INCOTHER`, `INCALIM`, `INCALOTH`
+**1. build_earned_income_panel_v6.py** → `output/earned_income_panel.csv`
+- Earned income = wages, self-employment and farm income, interest, dividends and rent (CPS), plus employer benefits, pension and other market income and realized capital gains (CBO Table 5).
+- Wages are scaled up for CPS underreporting (Bee et al. 2023): 17.1% for the bottom quintile down to 3.6% for the top.
+- Households are ranked the way CBO ranks them: income divided by the square root of household size, with 20% of people (not households) in each quintile.
+- For 2014, only the redesigned 3/8 CPS sample is kept (`HFLAG == 1`).
+- From the 2019 survey on, IPUMS `INCRETIR` no longer includes pensions and annuities, so the ranking rebuilds retirement income from `INCPEN1`, `INCPEN2`, `INCRANN`, `INCRET1` and `INCRET2`.
+- CBO's employee retirement contributions are not added: CPS wages are pay before deductions, so they already include them.
 
----
+**2. transfer_distribution_panel_v16.py** → `output/transfer_distribution_panel.csv`
+- National totals: BEA NIPA Table 3.12 for every program BEA counts as a social benefit.
+- Other sources fill in what BEA leaves out:
+  - rental and public housing aid, internet discounts, flood insurance net cost (OMB)
+  - school, child care and summer meals, and donated food (USDA)
+  - Lifeline (USAC)
+  - FEMA home repair grants (OpenFEMA)
+  - public transit and Amtrak operating losses (BEA Tables 3.8 and 3.17)
+  - 2021 rent and mortgage relief (BEA Table 5.11)
+  - the subsidy value of federal loans: student loans, USDA home loans, SBA disaster home loans, and FHA, VA and USDA mortgage guarantees (OMB Federal Credit Supplement)
+- Social Security is split into retirement (OASI) and disability (DI) using the SSA trust fund reports.
+- Medicare is net of the premiums enrollees pay (Medicare Trustees).
+- Each program is split across quintiles using CBO Tables 5 and 6, the Survey of Consumer Finances (loans, FEMA, flood insurance) or the Consumer Expenditure Survey (transit). Household counts come from CBO Table 1.
+- Refundable credits (EITC, child tax credit) are counted once, as lower income taxes, not as transfers.
+- Also writes `credit_subsidy.csv`, `student_loan_subsidy.csv` and `v16_additions.csv`.
 
-## Methodology appendix
+**3. tax_distribution_panel_v9.py** → `output/tax_distribution_panel.csv`
+- **Federal income, payroll, corporate and excise taxes:** CBO Table 7.
+- **Customs, estate and gift taxes, and other social insurance taxes:** OMB totals. Estate and gift taxes are split using Treasury's Office of Tax Analysis shares.
+- **Corporate income tax:** federal and state, assigned the way CBO does it, with 75% on owners of capital and 25% on workers.
+- **State and local taxes** (Census totals), split by:
+  - sales and other taxes: consumer spending shares (BLS CEX)
+  - income tax: CPS `STATETAX` (income years 1991–2022); for 1979–1990, NBER TAXSIM (step 0), tied to the CPS in 1991
+  - property tax on homes: CPS `PROPTAX` (income years 1991–2017), with the total from BEA; 2018–2022 follow average property tax by income fifth in the CEX, tied to the CPS in 2017; the 1991 shares are held for 1979–1990
+- Property taxes paid by businesses are left out.
 
-This section is preserved from the original methodology blueprint
-(`docs/DATA_DICTIONARY_AND_METHODOLOGY.md`) and documents the early-vintage
-design choices that informed the current pipeline. The current scripts
-have diverged from this blueprint in several places (most notably: S&L
-taxes are no longer ITEP-based; private transfers are no longer scaled
-from Gramm's 2017 values; the panel structure now produces five separate
-CSVs instead of one master `comprehensive_panel.csv`). It is retained here
-for audit purposes.
+**4. income_after_taxes_transfers_panel_v7.py** → `output/income_after_taxes_transfers_panel.csv`
+- Combines steps 1–3 and adds the corporate tax to earned income, so the same dollars appear in income and in taxes.
+- **Private transfers** have two parts:
+  - what CPS households report receiving: child support, alimony, help from outside the household, other income;
+  - charitable giving that reaches poor households: 30.6% of Giving USA giving, not counting gifts to foundations. It is split by each quintile's share of poor households.
+- **Per person.** Also reports income per person (divided by CBO's average household size for the quintile) and size-adjusted income (divided by the square root of that size).
 
-### Income concept
+**5. top_percentile_taxes_transfers_panel_v9.py** → `output/top_percentile_taxes_transfers_panel.csv`
+- **Groups:**
+  - CBO groups inside the top 20%: 81–90th, 91–95th and 96–99th percentiles, and the top 1%;
+  - IRS groups: top 0.1%, 0.01% and 0.001% (2001–2022);
+  - the 400 highest-income returns (IRS, 1992–2014; estimated after 2014).
+- **State and local taxes** follow ITEP's Who Pays? 7th edition rates by income group. Above the top 1%, the top-1% rate is held.
+- **Private transfers** are the top-20% amount for every top group.
+- **Estate and corporate taxes** for the IRS groups scale with non-wage income.
 
-The income concept we attempt to measure for each household is:
+**6. sensitivity_table.py** → `output/sensitivity_table.csv`, `output/sensitivity_table_top_groups.csv`
+- The top/bottom ratio after taxes and transfers in 1979 and 2022 under each change: size-adjusted; per person; Medicaid counted at 50% and 20% of its cost; no Medicaid or Medicare; and a 95% range for CPS sampling error (households re-drawn 300 times).
+- For the top groups: state and local taxes proportional to income instead of ITEP's rates, and the range of the estimated top-400 tax rate for 2022.
 
-```
-IAT  =  E + G + P − T
-```
+**Figures and tables**
 
-where:
+| Script | Makes | In the paper |
+|---|---|---|
+| `report_figures_v4.py` | top/bottom ratio; 2022 net fiscal position | Figures 1, 2 |
+| `cpi_bias_adjusted_v5_dbpi.py` | `cpi_adjusted_v3_dbpi_1979_2022.csv`, price index chart | Figure 3 |
+| `income_visualizations_v3.py` | real earned income, real income after taxes and transfers, net tax rate, by quintile | Figures 4, 5, 6 |
+| `charts_5_6_ultra_top_v4.py` | real income for the top groups | Figure 7 |
+| `per_person_figures_v2.py` | ratio measured three ways; real income per person | Figures 8, 9 |
+| `top1_share_comparison_v4.py` | top 1% share next to CBO, Piketty–Saez–Zucman and Auten–Splinter | Figure 10, Table 3 |
+| `inequality_decomposition.py` | what drove the change in the ratio and the Gini | Table 4 |
+| `appendix_group_tables_v4.py` | parts of income, transfers and taxes by group, 1979 and 2022 | Tables A1–A4 |
+| `tax_rate_and_gini_figures_v2.py` | Gini coefficients; tax rate by group | Figures A1, A2 |
 
-* `E` (earned income) — wages, employer benefits, business and financial income
-* `G` (government transfers) — cash + in-kind, both social insurance and means-tested
-* `P` (private transfers) — child support, alimony, informal cash assistance, household-directed charitable giving
-* `T` (total taxes) — federal + state + local, individual only (corporate excluded)
-
-The Census Bureau "money income" measure used in headline inequality
-statistics is conceptually `E + G_cash` — it omits in-kind transfers
-(`G − G_cash`), all of `P`, and all of `T`. Households are also *ranked*
-by money income, not by a post-fisc concept, so a retired household
-receiving $30K in Medicare benefits and a working-age household earning
-$30K from wages appear in the same Census quintile despite very different
-consumption capacity.
-
-### Why True CPI rather than CPI-U
-
-Any statement about real income growth depends on the price index used to
-convert nominal dollars across decades. The default CPI-U is known to
-overstate true inflation, and the overstatement compounds. Three documented
-biases:
-
-* **Substitution bias** (~0.5pp/yr) — CPI-U is a modified-Laspeyres index
-  that holds expenditure shares fixed within a basket cycle; consumers
-  substitute toward cheaper alternatives, but the index doesn't capture
-  this. Removing it produces the "Chained CPI / PCEPI" line using BEA's
-  PCEPI for 1979–1999 spliced to BLS's C-CPI-U from 2000.
-* **Quality bias** — CPI assumes a 2022 car or phone is the same product
-  as its 1979 counterpart, which it isn't. Boskin (1996) estimated 0.6pp/yr;
-  Moulton (2018) estimates 0.37pp/yr post-2000 reforms; ~0.30pp/yr after
-  BLS expanded hedonic adjustment to mobile phones in 2018.
-* **New-product bias** — smartphones, GPS, video streaming, mRNA vaccines
-  enter the index only after they reach mass adoption; their early-period
-  welfare gains never appear in the price history.
-
-The "True CPI" series compounds the documented bias schedule on top of the
-substitution-corrected index, producing 176% cumulative inflation 1979–2022
-versus 303% for the official CPI-U. Cross-checked against the BLS
-Disease-Based Price Index for medical care, which shows ~50% cumulative
-inflation 1999–2017 vs ~75% for official CPI Medical Care.
-
-### S&L tax distribution methodology
-
-The current pipeline distributes State & Local tax totals from TPC/Census
-using three keys (BLS CEX expenditure shares for sales; CPS homeownership ×
-income for property; CPS wage income for state income tax). An earlier
-vintage of the project used ITEP "Who Pays?" effective tax rates applied
-to CBO income, snapshot at 2024 law. That approach has the virtue of being
-simple but the disadvantage of assuming S&L tax structures haven't changed
-over 1979–2022 — which is plainly wrong (many states adopted income taxes
-mid-period; Prop 13 capped property taxes in 1978; etc.). The CEX/CPS
-approach used in the current pipeline picks up year-specific expenditure
-patterns at the cost of more moving parts.
-
-### Quintile ordering in the early years
-
-A careful reader will notice that in `fig_real_income_after_taxes_transfers_by_quintile.png`
-the Bottom and Second quintile lines nearly overlap and slightly cross for
-the first few years of the panel (1979–1985). This is not a measurement
-error but a real feature of the late-1970s post-fisc distribution.
-
-In 1979 the Bottom quintile's per-household IAT was $9,029, slightly
-above the Second quintile's $8,637. The cause is demographic: the Bottom
-quintile in the late 1970s was disproportionately retired-elderly
-households living on Social Security — very low earned income (~$2,800),
-large OASI benefits (~$8,100), almost no income tax. The Second quintile
-was disproportionately working-poor households earning roughly five times
-more in the market (~$13,400) but paying ~$7,800 in taxes and receiving
-only ~$3,000 in transfers.
-
-The ordering normalizes after about 1985 as the EITC expanded (raising
-Second-quintile post-tax income), AFDC and other cash welfare programs
-tightened (lowering Bottom-quintile transfers), and the elderly-retired
-share of the bottom quintile fell.
-
-### Cross-validation sources retained in `data/raw/`
-
-The repo includes several datasets that are not directly read by the
-current pipeline but are useful for cross-validation:
-
-* `data/raw/psz/PSZ2022AppendixTablesII(Distrib).xlsx` — Piketty-Saez-Zucman
-  Distributional National Accounts (1913–2022). Used to spot-check top-income
-  shares in the ultra-top panel.
-* `data/raw/itep/ITEP_WhoPays7_Data_Jan2024rev.xlsx` — ITEP "Who Pays?" 7th
-  Edition (state-by-state effective tax rates, 2024 tax law). Used in early
-  vintages and retained for sensitivity analysis.
-* `data/raw/ahs/` — American Housing Survey microdata for housing-quality
-  cross-checks.
-* `data/raw/bls_pumd/intrvw{15,16,…,22}.zip` — BLS CEX Public Use Microdata
-  for sensitivity analysis of the CEX expenditure-share keys.
-
-### Known limitations
-
-1. **Medicare valuation.** The panel reports Medicare net of beneficiary-paid
-   Part B/D premiums and out-of-pocket cost-sharing. An alternative is to
-   value Medicare at insurance-equivalent value, which is substantially
-   lower than gross outlays.
-2. **Corporate income tax incidence.** Excluded from the household burden
-   in this panel; tax-incidence literature is not unanimous. Sensitivity
-   analysis with alternative assumptions (100% capital, 50/50, 100% labor)
-   is straightforward to run.
-3. **Private transfer fractions.** The household-directed fractions
-   (Religion 5%, Health 8%, etc.) are central estimates with wide bounds.
-4. **Static state and local tax shares.** The CEX expenditure shares used
-   to distribute S&L sales taxes are pulled annually 1984–2022, but
-   1979–1983 uses a 1984 proxy.
-5. **CPS underreporting.** In-kind transfers are systematically
-   underreported in CPS ASEC; the pipeline mitigates this by using
-   administrative national totals and CBO distribution weights rather
-   than CPS receipts directly.
-6. **Forbes 400 post-2014.** IRS discontinued the Top 400 publication
-   after 2014. The 2015–2022 Forbes 400 estimates extrapolate from IRS
-   Table 4.1 Time Series Top 0.001% data and should be read with
-   appropriate caution.
+Real-dollar charts are in 2022 dollars, using the bias-adjusted price index in `output/cpi_adjusted_v3_dbpi_1979_2022.csv`.
 
 ---
 
-## Dependencies
+## Raw data (`data/raw/`)
 
-See `requirements.txt`. Tested with Python 3.10–3.13.
+| Folder | File(s) | Used by | Source |
+|---|---|---|---|
+| (top level) | `cps_00015.csv` | 1, 3, 4, 6 | IPUMS CPS ASEC, survey years 1980–2023. Not in the repo: download it yourself (see below). |
+| (top level) | `cps_taxsim_1980_1992.csv` | 0 | IPUMS CPS ASEC, survey years 1980–1992. Not in the repo (see below). |
+| `cbo/` | `households_ranked_by_market_inc_table_01/03/05/06/07/12_*.csv` | 1–5, appendix tables | [CBO, The Distribution of Household Income, 2022](https://www.cbo.gov/publication/61911) (January 2026), Additional Data for Researchers |
+| `cbo/` | `61911-additional-data-for-researchers.zip` | top 1% share (Table 10 is read from the zip) | same |
+| `bea/` | `Table-1.xlsx` (NIPA Table 3.12) | 2 | BEA |
+| `bea/` | `NipaDataQ_W027RC.csv` (rent and mortgage relief) | 2 | BEA |
+| `bea/` | `NipaDataA_transit.csv` (transit and rail series from Tables 3.8, 3.13, 3.17) | 2 | BEA |
+| `bea/` | `A2016C1A027NBEA.csv` (property tax on owner-occupied homes) | 3 | BEA via FRED |
+| `bea/` | `NipaDataA_CON150.csv` | 3 | BEA |
+| `bea/` | `PCEPI_annual.csv` | 1, 3, 5 | BEA PCE price index via FRED |
+| `oasdi/` | `OASI_Trust_Fund_Cost_*.csv`, `DI_Trust_Fund_Cost_*.csv` | 2 | SSA |
+| `meds/` | `Operations of the Hospital Insurance (HI) Trust Fund*.xlsx`, `...Part B Account*.xlsx`, `...Part D Account*.xlsx` | 2 | Medicare Trustees Report 2025, Expanded and Supplementary Tables |
+| `omb/` | `outlays_fy2027.xlsx` | 2 | OMB Public Budget Database, FY2027 |
+| `omb/` | `BUDGET-2027-FCS.xlsx` | 2 | OMB Federal Credit Supplement, FY2027 |
+| `omb/` | `BUDGET-2027-DB-3.xlsx`, `BUDGET-2027-TAB-3-4.xlsx`, `BUDGET-2027-TAB-3-5.xlsx` | 3 | OMB Historical Tables 2.4 and 2.5, FY2027 |
+| `usda/` | `cncost.xlsx`, `ccsummar.xlsx`, `sfsummar.xlsx`, `fdfoodcosts-sum*.xlsx` | 2 | USDA FNS (school, child care and summer meals; food distribution) |
+| `usac/` | `USAC_USF_Disbursements_1998_2022.xlsx` | 2 | USAC annual reports |
+| `fema/` | `HousingAssistanceOwners*.csv`, `DisasterDeclarationsSummaries*.csv`, `NfipClaims_v3_selected_columns*.csv` | 2 | [OpenFEMA](https://www.fema.gov/about/openfema/data-sets) |
+| `sba/` | `*Disaster_Loan_Data_FY*.xlsx` or `sba_disaster_loan_data_fy*.xlsx` | 2 | [SBA Disaster Loan Data](https://data.sba.gov/dataset/disaster-loan-data) |
+| `scf/` | `scfp1989excel.zip` … `scfp2022excel.zip` | 2 | [Federal Reserve, Survey of Consumer Finances](https://www.federalreserve.gov/econres/scfindex.htm), summary extract |
+| `census_sl/` | `results.csv` | 3 | Census State and Local Government Finances (Tax Policy Center query system) |
+| `bls_ce/` | `cex_sales_tax_distribution_weights_detailed_COMPLETE.csv` | 3 | BLS Consumer Expenditure Survey (PDF tables in the same folder) |
+| `bls_ce/` | `cex_property_tax_by_quintile_2017_2022.csv` | 3 | [BLS Consumer Expenditure Survey, Table 1101](https://www.bls.gov/cex/tables/calendar-year/mean-item-share-average-standard-error/cu-income-quintiles-before-taxes-2022.xlsx) |
+| `bls_ce/` | `cx_530311_intracity_transit_quintiles.csv` | 2 | [BLS CE time series](https://download.bls.gov/pub/time.series/cx/) |
+| `treasury_ota/` | `Authors_Compilation-treasury_estate_gift_shares.csv` | 3, 5 | Treasury Office of Tax Analysis distribution tables (in the same folder) |
+| `giving_USA/` | `giving_usa_recipients_1979_2022.csv` | 4 | Giving USA (PDFs in the same folder) |
+| `irs_soi/` | `22in41ts.xls`, `*in03etr.xls`, `*in43ts.xls` | 5 | IRS Statistics of Income, Tables 4.1 and 4.3 |
+| `forbes-400-irs/` | `14intop400.pdf` | 5 (typed into the script) | IRS, The 400 Individual Income Tax Returns Reporting the Largest Adjusted Gross Incomes |
+| `itep/` | `ITEP_WhoPays7_Data_Jan2024rev.xlsx` | 5 | [ITEP, Who Pays? 7th edition](https://itep.org/wp-content/uploads/ITEP-Who-Pays-7th-edition.pdf) |
+| `psz/` | `PSZ2022AppendixTablesII(Distrib).xlsx` | top 1% share | [Piketty, Saez and Zucman](https://gabriel-zucman.eu/usdina/), Tables II, February 2022 update |
+| `auten_splinter/` | `AS2024_TableA1_top1.csv` | top 1% share | [Auten and Splinter (2024)](http://davidsplinter.com/AutenSplinter-Tax_Data_and_Inequality.pdf), Table A1 |
+| `src/` | `dbpis-for-17-broad-categories.xlsx` | price index | [BLS Disease-Based Price Indexes](https://www.bls.gov/pir/disease/dbpis-for-17-broad-categories.xlsx) |
 
-```
-pandas>=2.0
-numpy>=1.23
-openpyxl>=3.1
-xlrd==1.2.0      # required for legacy .xls files; pinned because 2.0+ dropped .xls support
-plotly>=5.18
-kaleido==0.2.1   # PNG export backend for plotly; pinned for stability
-requests>=2.28
-```
+### CPS extract (IPUMS)
 
-Plus `jupyter` for the notebooks (not in `requirements.txt` because it's
-only used for the notebooks, not the canonical `.py` scripts).
+Register at [cps.ipums.org](https://cps.ipums.org). The extract is ASEC only, in CSV format, saved as `data/raw/cps_00015.csv`.
+
+- **Samples:** survey years 1980–2023, including both 2014 samples.
+- **Variables (28):**
+
+`YEAR SERIAL RELATE ASECWTH ASECFLAG HFLAG INCWAGE INCBUS INCFARM INCDIVID INCINT INCRENT INCRETIR INCDRT INCCHILD INCASIST INCOTHER INCALIM INCALOTH OFFPOV FILESTAT STATETAX PROPTAX INCPEN1 INCPEN2 INCRANN INCRET1 INCRET2`
+
+### TAXSIM extract (IPUMS)
+
+A second ASEC-only CSV extract, saved as `data/raw/cps_taxsim_1980_1992.csv`.
+
+- **Samples:** survey years 1980–1992.
+- **Variables (18):**
+
+`YEAR SERIAL PERNUM ASECWTH STATEFIP AGE SPLOC MOMLOC POPLOC INCWAGE INCBUS INCFARM INCSS INCRETIR INCINT INCDIVID INCRENT INCDRT`
+
+IPUMS data cannot be reposted, so neither file is in the repo.
+
+---
+
+## Main assumptions
+
+- Medicare and Medicaid are counted at what the government spends. The sensitivity table shows the ratio with Medicaid at 50% and 20% of cost.
+- Headline results are per household. Per-person and size-adjusted results are reported alongside.
+- State income tax shares for 1979–1990 come from NBER TAXSIM, without capital gains or itemized deductions. Property tax shares before 1991 are held at their 1991 level. Property tax shares after 2017 follow the Consumer Expenditure Survey, tied to the CPS in 2017.
+- Sales and excise taxes are split by consumer spending, as CBO does for federal excise taxes.
+- OMB, USDA and Census fiscal-year figures are used as calendar years.
+- Inside the top 20%, the ITEP state and local tax rates reflect 2024 law and are used for every year.
+- For the top 400 returns, 2015–2022 are estimated, and wage shares before 2014 are held at 2014.
+- Pandemic loans and relief payments to nonprofits (2020–2022) are counted as transfers, as BEA counts them.
+
+The paper's Limitations section discusses each of these.
 
 ---
 
 ## License
 
-MIT License — see `LICENSE`. The source code, scripts, and derived panel
-CSVs in `output/` are MIT-licensed. The upstream administrative data in
-`data/raw/` retains each publisher's original license; the CPS ASEC
-extract in particular requires IPUMS registration and an end-user agreement.
-
----
+MIT for the code and the files in `output/`. Raw data keep each publisher's terms; the CPS extract requires an IPUMS account.
 
 ## Citation
 
 ```
-Poleshuk, Patrick. (2026). U.S. Household Income, Taxes, and Transfers:
-A Reproducible Distributional Panel, 1979–2022. GitHub repository:
+Poleshuk, Patrick. (2026). U.S. Household Income After Taxes and Transfers, 1979–2022.
 https://github.com/Patrickkp1/tax-transfer-inequality
 ```
 
-For IPUMS CPS, also cite:
+NBER TAXSIM: Feenberg, D., and E. Coutts. (1993). An Introduction to the TAXSIM Model. Journal of Policy Analysis and Management 12(1): 189–194.
 
-```
-Flood, S., King, M., Rodgers, R., Ruggles, S., Warren, J. R., &
-Westberry, M. (2024). Integrated Public Use Microdata Series, Current
-Population Survey: Version 12.0 [dataset]. Minneapolis, MN: IPUMS.
-https://doi.org/10.18128/D030.V12.0
-```
-
----
-
-## References
-
-* Boskin, M., Dulberger, E., Gordon, R., Griliches, Z., & Jorgenson, D.
-  (1996). *Toward a More Accurate Measure of the Cost of Living: Final
-  Report to the Senate Finance Committee.*
-* CBO (2023). *The Distribution of Household Income, 1979–2020.*
-  Supplemental data tables.
-* Early, D., & Furth, S. (2021). "A Better Price Index." Mercatus Center.
-* Gramm, P., Ekelund, R., & Early, J. (2022). *The Myth of American
-  Inequality: How Government Biases Policy Debate.* Rowman & Littlefield.
-* Karen, R. (2023). "The Distribution of Private Transfers." *LIS Working
-  Paper Series*, No. 851.
-* Lebow, D., & Rudd, J. (2003). "Measurement Error in the Consumer Price
-  Index: Where Do We Stand?" *Journal of Economic Literature*, 41(1).
-* Meyer, B., & Sullivan, J. (2012). "Identifying the Disadvantaged: Official
-  Poverty, Consumption Poverty, and the New Supplemental Poverty Measure."
-  *Journal of Economic Perspectives*, 26(3): 111–136.
-* Moulton, B. (2018). "The Measurement of Output, Prices, and Productivity:
-  What's Changed Since the Boskin Commission?" Brookings Institution.
-* Piketty, T., Saez, E., & Zucman, G. (2018). "Distributional National
-  Accounts: Methods and Estimates for the United States." *Quarterly
-  Journal of Economics*, 133(2): 553–609.
-* Yagan, D. (2023). "What Is the Average Federal Individual Income Tax Rate
-  on the Wealthiest Americans?" *Oxford Review of Economic Policy*, 39(3).
+IPUMS CPS: Flood, S., et al. (2024). IPUMS CPS: Version 12.0 [dataset]. Minneapolis, MN: IPUMS. https://doi.org/10.18128/D030.V12.0
